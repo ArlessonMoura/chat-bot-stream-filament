@@ -6,36 +6,44 @@ use Livewire\Component;
 use App\Services\AIChatService;
 use Illuminate\Support\Facades\Log;
 
-use function Illuminate\Log\log;
-
 class Chatbot extends Component
 {
-   public $message = '';
+    public $prompt = '';
     public $chat = [];
+    public $isTyping = false;
 
-    public function send(AIChatService $ai)
+    public function submitPrompt()
     {
-        $userMessage = trim($this->message);
-        if (!$userMessage) return;
+        $trimmedPrompt = trim($this->prompt);
+        if (!$trimmedPrompt) return;
 
-        // Adiciona a mensagem do usuário
-        $this->chat[] = ['role' => 'user', 'content' => $userMessage];
-        $this->message = '';
+        $this->chat[] = ['role' => 'user', 'content' => $trimmedPrompt];
+        $this->prompt = '';
 
-        // Cria resposta inicial vazia
         $this->chat[] = ['role' => 'bot', 'content' => ''];
+
+        $this->js('$wire.ask()');
+    }
+
+    public function ask(AIChatService $ai)
+    {
+        $this->isTyping = true;
+
+        $userMessage = collect($this->chat)->where('role', 'user')->last()['content'];
         $botIndex = count($this->chat) - 1;
 
-        // Streaming chunk por chunk
-        
-        $teste = $ai->streamResponse($userMessage, function ($chunk) use (&$botIndex) {
-            
-           
-            
-            $this->chat[$botIndex]['content'] .= $chunk;
-            $this->emit('scrollToBottom');
-        });
-        Log::info($teste);
+        try {
+            $ai->streamResponse($userMessage, function ($chunk) use ($botIndex) {
+                $this->chat[$botIndex]['content'] .= $chunk;
+                $this->stream(to: 'bot-message-' . $botIndex, content: $chunk);
+            });
+
+        } catch (\Exception $e) {
+            Log::error('Erro no streaming: ' . $e->getMessage());
+            $this->chat[$botIndex]['content'] = 'Erro ao processar sua pergunta. Tente novamente.';
+        }
+
+        $this->isTyping = false;
     }
 
     public function render()
