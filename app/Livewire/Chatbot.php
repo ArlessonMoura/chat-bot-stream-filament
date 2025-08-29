@@ -28,10 +28,8 @@ class Chatbot extends Component
 
         // Streaming chunk por chunk
         
-        $teste = $ai->streamResponse($userMessage, function ($chunk) use (&$botIndex) {
-            
-           
-            
+        $teste = $ai->streamResponse($userMessage, function ($chunk) use (&$botIndex) {      
+                      
             $this->chat[$botIndex]['content'] .= $chunk;
             $this->emit('scrollToBottom');
         });
